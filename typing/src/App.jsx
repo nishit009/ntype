@@ -34,56 +34,57 @@ const Themes = [
 ];
 
 function App() {
-  const [currentindex, setCurrentindex] = useState(0);
-  const [iscorrect, setIscorrect] = useState("");
-  const [userinput, setUserinput] = useState("");
-  const [wordindex, setWordindex] = useState(0);
   const [selectedWords, setSelectedWords] = useState([]);
   const [backgroundTheme, setBackgroundTheme] = useState("");
   const containerRef = useRef(null);
-  const inputref = useRef(null);
+  const inputRef = useRef(null);
+  const [letterindex, setLetterindex] = useState(0);
+  const [wrongWord, setWrongWord] = useState(false);
   const selectedTheme = Themes.find((v) => v.name === backgroundTheme);
-  const handleKeyPress = (e) => {
-    const selectedW = selectedWords[wordindex];
-    const selectL = selectedW[currentindex];
-    if (e.key === selectL) {
-      setUserinput("");
-      setIscorrect("correct");
-      setCurrentindex((prev) => prev + 1);
-      if (currentindex + 1 >= selectedW.length) {
-        setCurrentindex(0);
-        setWordindex((prev) => prev + 1);
+
+  const handleClick = (e) => {
+    if (e.key === "Shift" || e.key === "CapsLock") return;
+    const currentWord = selectedWords[wordindex];
+    const currentLetter = currentWord?.[letterindex];
+
+    if (e.key === currentLetter) {
+      setLetterindex((prev) => prev + 1);
+      setWrongWord(false);
+    } else if (e.key !== "Backspace" && e.key !== " ") {
+      setLetterindex((prev) => prev + 1);
+      setWrongWord(true);
+    } else if (e.key === "Backspace" && letterindex > 0) {
+      setLetterindex((prev) => prev - 1);
+      if (currentWord[letterindex - 1] === currentLetter) {
+        setWrongWord(false);
       }
-    } else if (e.key === " ") {
-      setUserinput("");
+    } else if (e.key === " " && letterindex === currentWord?.length) {
       setWordindex((prev) => prev + 1);
-      setCurrentindex(0);
-    } else {
-      setIscorrect("incorrect");
+      setLetterindex(0);
+      setWrongWord(false);
+      e.preventDefault();
     }
   };
+
   useEffect(() => {
-    {
-      backgroundTheme && inputref.current.focus();
+    if (backgroundTheme && inputRef.current) {
+      inputRef.current.focus();
     }
     if (!backgroundTheme || !containerRef.current) return;
     if (!selectedTheme || !selectedTheme.words) return;
 
-    const maxwidth = containerRef.current.clientWidth; // Get container width
+    const maxwidth = containerRef.current.clientWidth;
     let totalWidth = 0;
     let newSelectedWords = [];
 
-    // Shuffle words
     const shuffledWords = [...(selectedTheme?.words || [])].sort(
       () => 0.5 - Math.random()
     );
 
-    // Create a hidden span to measure text width
     const span = document.createElement("span");
     span.style.visibility = "hidden";
     span.style.position = "absolute";
-    span.style.whiteSpace = "nowrap";
-    span.style.fontSize = "1.25rem"; // Tailwind XL (≈ 20px)
+    span.style.fontSize = "1.25rem";
     span.style.fontFamily = "Arial, sans-serif";
     document.body.appendChild(span);
 
@@ -93,14 +94,14 @@ function App() {
 
       if (totalWidth + wordWidth <= maxwidth) {
         newSelectedWords.push(word);
-        totalWidth += wordWidth + 10; // Add spacing
+        totalWidth += wordWidth + 10;
       } else {
         break;
       }
     }
 
     setSelectedWords(newSelectedWords);
-    document.body.removeChild(span); // Clean up
+    document.body.removeChild(span);
   }, [backgroundTheme]);
 
   return (
@@ -109,9 +110,8 @@ function App() {
         className="w-[1100px] h-[500px] border-2 space-y-[50px]"
         ref={containerRef}
       >
-        {/* Buttons */}
         <div className="w-full h-fit flex flex-row justify-evenly items-center border-2 rounded-4xl mt-[4px]">
-          {["i", "j", "k", "l", "m", "n", "o"].map((char, index) => (
+          {"ijklmn".split("").map((char, index) => (
             <button
               key={index}
               className="border-2 h-[25px] cursor-pointer w-[25px] mt-[8px]"
@@ -121,7 +121,6 @@ function App() {
           ))}
         </div>
 
-        {/* Theme Selection */}
         <div className="h-[300px] w-full border-2 flex flex-col items-center justify-center">
           <div
             className="flex justify-center items-center border-2 w-[200px] h-fit"
@@ -135,7 +134,7 @@ function App() {
             }}
           >
             <select
-              className="w-[200px] h-[50px] appearance-none -webkit-appearance: none px-[45px] bg-transparent text-transparent"
+              className="w-[200px] h-[50px] appearance-none px-[45px] bg-transparent text-transparent"
               onChange={(e) => setBackgroundTheme(e.target.value)}
               defaultValue=""
             >
@@ -149,24 +148,24 @@ function App() {
               ))}
             </select>
           </div>
-          {/* Display Selected Words */}
           {backgroundTheme && (
-            <div className={`w-full px-[20px] text-xl flex flex-wrap gap-2 `}>
-              {selectedWords.map((word, ind) => (
-                <div
-                  key={ind}
-                  className={`${
-                    iscorrect === "incorrect" ? "text-red-400" : "text-[#666]"
-                  }`}
-                >
-                  {word.split("").map((char, index) => (
+            <div className="w-full px-[20px] text-xl flex flex-wrap gap-2">
+              {selectedWords.map((word, wIndex) => (
+                <div key={wIndex}>
+                  {word.split("").map((char, cIndex) => (
                     <span
-                      key={index}
-                      className={`${
-                        iscorrect === "correct"
+                      key={cIndex}
+                      className={
+                        wIndex < wordindex
                           ? "text-green-500"
-                          : "text-[#666]"
-                      }`}
+                          : wIndex === wordindex && cIndex < letterindex
+                          ? wrongWord
+                            ? "text-red-500"
+                            : "text-green-500"
+                          : wIndex === wordindex && cIndex === letterindex
+                          ? "underline"
+                          : "text-gray-500"
+                      }
                     >
                       {char}
                     </span>
@@ -174,12 +173,9 @@ function App() {
                 </div>
               ))}
               <input
-                type="text"
-                value={userinput}
-                onChange={(e) => setUserinput(e.target.value)}
-                ref={inputref}
-                // className="absolute opacity-0"
-                onKeyDown={handleKeyPress}
+                ref={inputRef}
+                className="opacity-0 absolute"
+                onKeyDown={handleClick}
               />
             </div>
           )}
